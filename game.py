@@ -31,10 +31,17 @@ class Game:
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
+                    return
             key = pygame.key.get_pressed()
+            self.hero.move(key)
+            if key[pygame.K_j]:
+                self.hero.shoot()
+
             self.draw_bg()
             self.draw_hero()
-            self.hero.move(key)
+            for bul in self.hero.bullet_list:
+                bul.move()
+                bul.draw()
 
             pygame.display.update()
 
@@ -51,6 +58,7 @@ class Hero:
         self.hero = pygame.image.load("src/plan1.png")
         self.pos = Position((w - self.hero.get_width()) / 2, h - self.hero.get_height())
         self.speed = speed
+        self.bullet_list = []
 
     def draw(self):
         self.game.screen.blit(self.hero, (self.pos.x, self.pos.y))
@@ -67,6 +75,24 @@ class Hero:
             x += 1
         self.pos.y = self.pos.y + y * self.speed
         self.pos.x = self.pos.x + x * self.speed
+
+    def shoot(self):
+        bullet = Bullet(game, self)
+        self.bullet_list.append(bullet)
+
+
+class Bullet:
+    def __init__(self, game_obj: Game, hero: Hero, speed=20):
+        self.pos = Position(hero.pos.x + int(hero.hero.get_width() / 2), hero.pos.y)
+        self.bullet = pygame.image.load("src/bullet.png")
+        self.speed = speed
+        self.game = game_obj
+
+    def draw(self):
+        self.game.screen.blit(self.bullet, (self.pos.x, self.pos.y))
+
+    def move(self):
+        self.pos.y -= self.speed
 
 
 game = Game(400, 600)

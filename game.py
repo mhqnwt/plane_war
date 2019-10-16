@@ -14,6 +14,16 @@ class Position:
         return "({x}, {y})".format(x=self.x, y=self.y)
 
 
+class Rect:
+    def __init__(self, x, y, w, h):
+        self.left, self.top, self.right, self.bottom = x, y + h, x + w, y
+
+    @staticmethod
+    def collide(r1, r2):
+        return not (((r1.right < r2.left) or (r1.bottom > r2.top)) or (
+                (r2.right < r1.left) or (r2.bottom > r1.top)))
+
+
 class Game:
     def __init__(self, window_w, window_h, max_enemy_num=10):
         self.screen = pygame.display.set_mode(size=(window_w, window_h))
@@ -21,6 +31,16 @@ class Game:
         self.hero = Hero(self)
         self.enemy_list = []
         self.max_enemy_num = max_enemy_num
+
+    def hero_collided(self):
+        for e in self.enemy_list:
+            result = e.hero_collided(self.hero)
+            if result:
+                return True
+        return False
+
+    def bullet_collided(self):
+        self.hero.enemy_collided(self.enemy_list)
 
     def draw_bg(self):
         self.screen.blit(self.bg, (0, 0))
@@ -63,6 +83,8 @@ class Game:
             self.draw_hero()
             self.hero.move_draw_bullets()
 
+            self.bullet_collided()
+
             pygame.display.update()
 
 
@@ -83,6 +105,16 @@ class Enemy:
         w, h = pygame.display.get_surface().get_size()
         if self.pos.y > h:
             self.status = False
+
+    def get_rect(self) -> Rect:
+        return Rect(self.pos.x, self.pos.y, self.enemy.get_width(), self.enemy.get_height())
+
+    def hero_collided(self, hero):
+        tmp = Rect.collide(hero.get_rect(), self.get_rect())
+        if not tmp:
+            return True
+        else:
+            return False
 
 
 class Hero:
@@ -123,6 +155,22 @@ class Hero:
         for bul in self.bullet_list:
             bul.move()
             bul.draw()
+        self.bullet_list = list(filter(lambda e: e.status, self.bullet_list))
+
+    def enemy_collided(self, enemy_list):
+        for bul in self.bullet_list:
+            for enemy in enemy_list:
+                tmp = Rect.collide(bul.get_rect(), enemy.get_rect())
+                if tmp:
+                    bul.status = False
+                    enemy.status = False
+                    # TODO: enemy destroy with animation
+                    print("a enemy crashed")
+                    return True
+        return False
+
+    def get_rect(self) -> Rect:
+        return Rect(self.pos.x, self.pos.y, self.hero.get_width(), self.hero.get_height())
 
 
 class Bullet:
@@ -131,12 +179,18 @@ class Bullet:
         self.bullet = pygame.image.load("src/bullet.png")
         self.speed = speed
         self.game = game_obj
+        self.status = True
 
     def draw(self):
         self.game.screen.blit(self.bullet, (self.pos.x, self.pos.y))
 
     def move(self):
         self.pos.y -= self.speed
+        if self.pos.y < 0:
+            self.status = False
+
+    def get_rect(self) -> Rect:
+        return Rect(self.pos.x, self.pos.y, self.bullet.get_width(), self.bullet.get_height())
 
 
 game = Game(400, 600)

@@ -1,3 +1,4 @@
+import random
 import sys
 
 import pygame
@@ -14,16 +15,23 @@ class Position:
 
 
 class Game:
-    def __init__(self, window_w, window_h):
+    def __init__(self, window_w, window_h, max_enemy_num=10):
         self.screen = pygame.display.set_mode(size=(window_w, window_h))
         self.bg = pygame.image.load("src/background.png")
         self.hero = Hero(self)
+        self.enemy_list = []
+        self.max_enemy_num = max_enemy_num
 
     def draw_bg(self):
         self.screen.blit(self.bg, (0, 0))
 
     def draw_hero(self):
         self.hero.draw()
+
+    def move_draw_enemies(self):
+        for e in self.enemy_list:
+            e.move()
+            e.draw()
 
     def start(self):
         while True:
@@ -33,21 +41,52 @@ class Game:
                     sys.exit()
                     return
             key = pygame.key.get_pressed()
+            # 英雄响应键盘事件 - keyboard event for hero
+            # w, s, a, d = up, down, left, right
             self.hero.move(key)
             if key[pygame.K_j]:
                 self.hero.shoot()
 
+            # 画背景 - draw background
             self.draw_bg()
+            # 画敌人 - gen and draw enemy
+            e_more = self.max_enemy_num - len(self.enemy_list)
+            if e_more > 0:
+                for i in range(e_more):
+                    e = Enemy(self)
+                    self.enemy_list.append(e)
+
+            self.move_draw_enemies()
+            self.enemy_list = list(filter(lambda e: e.status, self.enemy_list))
+
+            # 画英雄和子弹 - draw hero and bullets
             self.draw_hero()
-            for bul in self.hero.bullet_list:
-                bul.move()
-                bul.draw()
+            self.hero.move_draw_bullets()
 
             pygame.display.update()
 
 
+class Enemy:
+    def __init__(self, game_obj: Game, speed=8):
+        self.game = game_obj
+        self.speed = speed
+        w, h = pygame.display.get_surface().get_size()
+        self.pos = Position(random.randint(10, w - 10), -1 * random.randint(10, h - 10))
+        self.enemy = pygame.image.load("src/enemy1.png")
+        self.status = True
+
+    def draw(self):
+        self.game.screen.blit(self.enemy, (self.pos.x, self.pos.y))
+
+    def move(self):
+        self.pos.y += self.speed
+        w, h = pygame.display.get_surface().get_size()
+        if self.pos.y > h:
+            self.status = False
+
+
 class Hero:
-    def __init__(self, game_obj: Game, speed=20):
+    def __init__(self, game_obj: Game, speed=10):
         """
         一个飞机对象
         :param game_obj:
@@ -79,6 +118,11 @@ class Hero:
     def shoot(self):
         bullet = Bullet(game, self)
         self.bullet_list.append(bullet)
+
+    def move_draw_bullets(self):
+        for bul in self.bullet_list:
+            bul.move()
+            bul.draw()
 
 
 class Bullet:

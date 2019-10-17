@@ -36,14 +36,19 @@ class Game:
         self.once_over, self.playing = False, False
         self.score = 0
 
-    def put_label(self, txt, top=100, sel=False):
+    def put_label(self, txt, top=100, is_desc=True, sel=False):
         font = pygame.font.SysFont("microsoft Yahei", 60)
         font_color = (255, 255, 255)
         font_background = (100, 100, 100)
         if sel:
             font_background = (0, 0, 0)
+        if is_desc:
+            font_color = (0, 0, 0)
         txt = "    {0}    ".format(txt)
-        surface = font.render(txt, False, font_color, font_background)
+        if is_desc:
+            surface = font.render(txt, False, font_color)
+        else:
+            surface = font.render(txt, False, font_color, font_background)
         w, h = pygame.display.get_surface().get_size()
         self.screen.blit(surface, (int((w - surface.get_width()) / 2), top))
 
@@ -122,14 +127,14 @@ class Game:
             if not self.playing:
                 self.draw_bg()
                 self.put_label("Plane War")
-                self.put_label("__{0}__".format(self.score), 200)
-                self.put_label("START", 300, self.sel_start)
-                self.put_label("QUIT", 400, not self.sel_start)
+                self.put_label("score:{0}".format(self.score), 200)
+                self.put_label("START", 300, False, self.sel_start)
+                self.put_label("QUIT", 400, False, not self.sel_start)
                 key = pygame.key.get_pressed()
                 if key[pygame.K_w] or key[pygame.K_s]:
                     self.sel_start = not self.sel_start
                     pygame.time.delay(200)
-                if key[pygame.K_RETURN]:
+                if key[pygame.K_j]:
                     if self.sel_start:
                         self.init_game()
                         self.playing = True

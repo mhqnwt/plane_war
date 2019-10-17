@@ -30,11 +30,11 @@ class Game:
         self.screen = pygame.display.set_mode(size=(window_w, window_h))
         self.bg = pygame.image.load("src/background.png")
         self.hero = Hero(self)
-        self.enemy_list = []
         self.max_enemy_num = max_enemy_num
-        self.once_over = True
         self.sel_start = True
-        self.playing = False
+        self.enemy_list = []
+        self.once_over, self.playing = False, False
+        self.score = 0
 
     def put_label(self, txt, top=100, sel=False):
         font = pygame.font.SysFont("microsoft Yahei", 60)
@@ -51,6 +51,8 @@ class Game:
         self.hero = Hero(self)
         self.enemy_list = []
         self.once_over = False
+        self.playing = True
+        self.score = 0
 
     def hero_collided(self):
         for e in self.enemy_list:
@@ -62,7 +64,8 @@ class Game:
         return False
 
     def bullet_collided(self):
-        self.hero.enemy_collided(self.enemy_list)
+        score = self.hero.enemy_collided(self.enemy_list)
+        self.score += score
 
     def draw_bg(self):
         self.screen.blit(self.bg, (0, 0))
@@ -103,13 +106,11 @@ class Game:
         self.bullet_collided()
         crashed = self.hero_collided()
         if crashed:
-            print("游戏结束")
             self.once_over = True
             self.hero.status = Status.Blow
             while self.hero.status == Status.Blow:
                 self.hero.draw()
                 pygame.display.update()
-            print("游戏结束2")
 
     def start(self):
         while True:
@@ -121,8 +122,9 @@ class Game:
             if not self.playing:
                 self.draw_bg()
                 self.put_label("Plane War")
-                self.put_label("START", 200, self.sel_start)
-                self.put_label("QUIT", 300, not self.sel_start)
+                self.put_label("__{0}__".format(self.score), 200)
+                self.put_label("START", 300, self.sel_start)
+                self.put_label("QUIT", 400, not self.sel_start)
                 key = pygame.key.get_pressed()
                 if key[pygame.K_w] or key[pygame.K_s]:
                     self.sel_start = not self.sel_start
@@ -150,22 +152,21 @@ class Status(Enum):
     Disappear = 0
 
 
-def get_blow_image_path(base, num, suffix):
+def get_blow_images(base, num, suffix):
     arr = []
     for i in range(num):
-        arr.append("{0}{1}.{2}".format(base, i + 1, suffix))
+        path = "{0}{1}.{2}".format(base, i + 1, suffix)
+        arr.append(pygame.image.load(path).convert_alpha())
     return arr
 
 
 class GameItem:
-    def __init__(self, game_obj: Game, pos: Position, img_path, blow_img_paths, speed=10, fall=True):
+    def __init__(self, game_obj: Game, pos: Position, img_path, blow_images, speed=10, fall=True):
         self.game, self.pos, self.img_path, self.speed, self.fall = game_obj, pos, img_path, speed, fall
         self.image = pygame.image.load(img_path).convert_alpha()
         self.status = Status.OK
         self.blow_index = 0
-        self.blow_images = []
-        for path in blow_img_paths:
-            self.blow_images.append(pygame.image.load(path).convert_alpha())
+        self.blow_images = blow_images
 
     def draw(self):
         if self.status == Status.OK:
@@ -176,7 +177,7 @@ class GameItem:
             if self.blow_index > len(self.blow_images) - 1:
                 self.status = Status.Disappear
 
-    def move(self):
+    def move(self, key=None):
         tmp = 1
         if not self.fall:
             tmp = -1
@@ -192,47 +193,35 @@ class GameItem:
 
 
 class Enemy(GameItem):
-    def __init__(self, game_obj: Game, speed=8):
+    def __init__(self, game_obj: Game, speed=8, score=1):
         w, h = pygame.display.get_surface().get_size()
         pos = Position(random.randint(10, w - 10), -1 * random.randint(10, h - 10))
-        super(Enemy, self).__init__(game_obj, pos, "src/enemy1.png", get_blow_image_path("src/enemy1_down", 4, "png"),
+        super(Enemy, self).__init__(game_obj, pos, "src/enemy1.png", get_blow_images("src/enemy1_down", 4, "png"),
                                     speed)
+        self.score = score
 
     def hero_collided(self, hero):
         tmp = Rect.collide(hero.get_collide_rect(), self.get_collide_rect())
         return tmp
 
 
-class Hero:
+class Hero(GameItem):
     def __init__(self, game_obj: Game, speed=10):
         """
         一个飞机对象
         :param game_obj:
         :param speed:
         """
-        self.game = game_obj
         w, h = pygame.display.get_surface().get_size()
-        self.hero = pygame.image.load("src/plan1.png")
-        self.pos = Position((w - self.hero.get_width()) / 2, h - self.hero.get_height())
+        hero = pygame.image.load("src/plan1.png")
+        super().__init__(game_obj, Position((w - hero.get_width()) / 2, h - hero.get_height()),
+                         "src/plan1.png", get_blow_images("src/me_destroy_", 4, "png"))
         self.speed = speed
-        self.status = Status.OK
         self.bullet_list = []
-        self.blow_images = []
-        tmp = get_blow_image_path("src/me_destroy_", 4, "png")
-        self.blow_index = 0
-        for path in tmp:
-            self.blow_images.append(pygame.image.load(path).convert_alpha())
 
-    def draw(self):
-        if self.status == Status.OK:
-            self.game.screen.blit(self.hero, (self.pos.x, self.pos.y))
-        elif self.status == Status.Blow:
-            self.game.screen.blit(self.blow_images[self.blow_index], (self.pos.x, self.pos.y))
-            self.blow_index += 1
-            if self.blow_index > len(self.blow_images) - 1:
-                self.status = Status.Disappear
-
-    def move(self, key):
+    def move(self, key=None):
+        if key is None:
+            return
         x, y = 0, 0
         if key[pygame.K_w]:
             y -= 1
@@ -256,24 +245,24 @@ class Hero:
         self.bullet_list = list(filter(lambda e: e.status == Status.OK, self.bullet_list))
 
     def enemy_collided(self, enemy_list):
+        ret = 0
         for bul in self.bullet_list:
             for enemy in enemy_list:
+                if enemy.status != Status.OK or bul.status != Status.OK:
+                    continue
                 tmp = Rect.collide(bul.get_collide_rect(), enemy.get_collide_rect())
                 if tmp:
                     bul.status = Status.Disappear
                     enemy.status = Status.Blow
                     # TODO: enemy destroy with animation
                     print("a enemy crashed")
-                    return True
-        return False
-
-    def get_collide_rect(self) -> Rect:
-        return Rect(self.pos.x, self.pos.y, self.hero.get_width(), self.hero.get_height())
+                    ret += enemy.score
+        return ret
 
 
 class Bullet(GameItem):
     def __init__(self, game_obj: Game, hero: Hero, speed=20):
-        pos = Position(hero.pos.x + int(hero.hero.get_width() / 2), hero.pos.y)
+        pos = Position(hero.pos.x + int(hero.image.get_width() / 2), hero.pos.y)
         super().__init__(game_obj, pos, "src/bullet.png", [], speed, False)
 
 

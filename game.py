@@ -4,6 +4,11 @@ from enum import Enum
 
 import pygame
 
+"""
+1. With Sprite, may not need to write collide self
+2. class Game is a real mess
+"""
+
 pygame.init()
 
 

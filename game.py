@@ -32,7 +32,20 @@ class Game:
         self.hero = Hero(self)
         self.enemy_list = []
         self.max_enemy_num = max_enemy_num
-        self.once_over = False
+        self.once_over = True
+        self.sel_start = True
+        self.playing = False
+
+    def put_label(self, txt, top=100, sel=False):
+        font = pygame.font.SysFont("microsoft Yahei", 60)
+        font_color = (255, 255, 255)
+        font_background = (100, 100, 100)
+        if sel:
+            font_background = (0, 0, 0)
+        txt = "    {0}    ".format(txt)
+        surface = font.render(txt, False, font_color, font_background)
+        w, h = pygame.display.get_surface().get_size()
+        self.screen.blit(surface, (int((w - surface.get_width()) / 2), top))
 
     def init_game(self):
         self.hero = Hero(self)
@@ -44,7 +57,6 @@ class Game:
             if e.status != Status.OK:
                 continue
             result = e.hero_collided(self.hero)
-            print(result)
             if result:
                 return True
         return False
@@ -64,48 +76,70 @@ class Game:
                 e.move()
             e.draw()
 
+    def fight(self):
+        key = pygame.key.get_pressed()
+        # 英雄响应键盘事件 - keyboard event for hero
+        # w, s, a, d = up, down, left, right
+        self.hero.move(key)
+        if key[pygame.K_j]:
+            self.hero.shoot()
+
+        # 画背景 - draw background
+        self.draw_bg()
+        # 画敌人 - gen and draw enemy
+        e_more = self.max_enemy_num - len(self.enemy_list)
+        if e_more > 0:
+            for i in range(e_more):
+                e = Enemy(self)
+                self.enemy_list.append(e)
+
+        self.move_draw_enemies()
+        self.enemy_list = list(filter(lambda e: e.status != Status.Disappear, self.enemy_list))
+
+        # 画英雄和子弹 - draw hero and bullets
+        self.draw_hero()
+        self.hero.move_draw_bullets()
+
+        self.bullet_collided()
+        crashed = self.hero_collided()
+        if crashed:
+            print("游戏结束")
+            self.once_over = True
+            self.hero.status = Status.Blow
+            while self.hero.status == Status.Blow:
+                self.hero.draw()
+                pygame.display.update()
+            print("游戏结束2")
+
     def start(self):
         while True:
-            if self.once_over:
-                self.init_game()
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
                     return
-            key = pygame.key.get_pressed()
-            # 英雄响应键盘事件 - keyboard event for hero
-            # w, s, a, d = up, down, left, right
-            self.hero.move(key)
-            if key[pygame.K_j]:
-                self.hero.shoot()
-
-            # 画背景 - draw background
-            self.draw_bg()
-            # 画敌人 - gen and draw enemy
-            e_more = self.max_enemy_num - len(self.enemy_list)
-            if e_more > 0:
-                for i in range(e_more):
-                    e = Enemy(self)
-                    self.enemy_list.append(e)
-
-            self.move_draw_enemies()
-            self.enemy_list = list(filter(lambda e: e.status != Status.Disappear, self.enemy_list))
-
-            # 画英雄和子弹 - draw hero and bullets
-            self.draw_hero()
-            self.hero.move_draw_bullets()
-
-            self.bullet_collided()
-            crashed = self.hero_collided()
-            if crashed:
-                print("游戏结束")
-                self.once_over = True
-                self.hero.status = Status.Blow
-                while self.hero.status == Status.Blow:
-                    self.hero.draw()
-                    pygame.display.update()
-                print("游戏结束2")
+            if not self.playing:
+                self.draw_bg()
+                self.put_label("Plane War")
+                self.put_label("START", 200, self.sel_start)
+                self.put_label("QUIT", 300, not self.sel_start)
+                key = pygame.key.get_pressed()
+                if key[pygame.K_w] or key[pygame.K_s]:
+                    self.sel_start = not self.sel_start
+                    pygame.time.delay(200)
+                if key[pygame.K_RETURN]:
+                    if self.sel_start:
+                        self.init_game()
+                        self.playing = True
+                    else:
+                        pygame.quit()
+                        sys.exit()
+                        return
+            else:
+                if self.once_over:
+                    self.playing = False
+                else:
+                    self.fight()
 
             pygame.display.update()
 
@@ -161,7 +195,8 @@ class Enemy(GameItem):
     def __init__(self, game_obj: Game, speed=8):
         w, h = pygame.display.get_surface().get_size()
         pos = Position(random.randint(10, w - 10), -1 * random.randint(10, h - 10))
-        super(Enemy, self).__init__(game_obj, pos, "src/enemy1.png", get_blow_image_path("src/enemy1_down", 4, "png"), speed)
+        super(Enemy, self).__init__(game_obj, pos, "src/enemy1.png", get_blow_image_path("src/enemy1_down", 4, "png"),
+                                    speed)
 
     def hero_collided(self, hero):
         tmp = Rect.collide(hero.get_collide_rect(), self.get_collide_rect())
